@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum StatusEvento {
+  RASCUNHO
+  ATIVO
+}
+
+enum RoleEvento {
+  ADMIN
+  CAMPO
+}
+
+enum StatusPedido {
+  PENDENTE
+  PAGO
+}
+
+model Usuario {
+  id                   String               @id
+  email                String
+  nome                 String
+  criado_em            DateTime             @default(now())
+  participacoes_evento ParticipacaoEvento[]
+  fotos                Foto[]
+}
+
+model Evento {
+  id                   String               @id @default(cuid())
+  nome                 String
+  slug                 String               @unique
+  data_evento          DateTime
+  preco_unitario_foto  Decimal
+  status               StatusEvento         @default(RASCUNHO)
+  criado_em            DateTime             @default(now())
+  participacoes_evento ParticipacaoEvento[]
+  fotos                Foto[]
+  pedidos              Pedido[]
+}
+
+model ParticipacaoEvento {
+  id                  String     @id @default(cuid())
+  usuario_id          String
+  evento_id           String
+  papel               RoleEvento
+  comissao_percentual Decimal
+  usuario             Usuario    @relation(fields: [usuario_id], references: [id])
+  evento              Evento     @relation(fields: [evento_id], references: [id])
+}
+
+model Foto {
+  id              String       @id @default(cuid())
+  evento_id       String
+  fotografo_id    String
+  url_original    String?
+  url_marca_dagua String?
+  horario_exif    DateTime?
+  criado_em       DateTime     @default(now())
+  evento          Evento       @relation(fields: [evento_id], references: [id])
+  fotografo       Usuario      @relation(fields: [fotografo_id], references: [id])
+  itens_pedido    ItemPedido[]
+}
+
+model Pedido {
+  id                String       @id @default(cuid())
+  evento_id         String
+  status            StatusPedido @default(PENDENTE)
+  session_id_stripe String?
+  email_cliente     String?
+  valor_total       Decimal
+  criado_em         DateTime     @default(now())
+  evento            Evento       @relation(fields: [evento_id], references: [id])
+  itens             ItemPedido[]
+}
+
+model ItemPedido {
+  id        String @id @default(cuid())
+  pedido_id String
+  foto_id   String
+  pedido    Pedido @relation(fields: [pedido_id], references: [id])
+  foto      Foto   @relation(fields: [foto_id], references: [id])
+
+  @@unique([pedido_id, foto_id])
+}
