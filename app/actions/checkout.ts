@@ -1,40 +1,11 @@
 "use server";
 
-import { headers } from "next/headers";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 
 type CheckoutResult =
   | { success: true; url: string }
   | { success: false; error: string };
-
-function getAppOrigin(requestOrigin: string | null) {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
-  const candidate = configuredUrl || requestOrigin;
-
-  if (!candidate) {
-    throw new Error(
-      "Configure NEXT_PUBLIC_APP_URL ou envie a origem da aplicação na requisição.",
-    );
-  }
-
-  let url: URL;
-  try {
-    url = new URL(candidate);
-  } catch {
-    throw new Error("A origem da aplicação configurada é inválida.");
-  }
-
-  if (
-    (url.protocol !== "https:" && url.protocol !== "http:") ||
-    url.username ||
-    url.password
-  ) {
-    throw new Error("A origem da aplicação configurada é inválida.");
-  }
-
-  return url.origin;
-}
 
 export async function checkout(
   eventoId: string,
@@ -97,10 +68,14 @@ export async function checkout(
     throw new Error("A variável de ambiente STRIPE_SECRET_KEY não está configurada.");
   }
 
-  const requestHeaders = await headers();
-  const appOrigin = getAppOrigin(requestHeaders.get("origin"));
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+  const normalizedAppUrl = appUrl.replace(/\/+$/, "");
   const stripe = new Stripe(secretKey);
-  const eventoUrl = `${appOrigin}/evento/${encodeURIComponent(evento.slug)}`;
+  const eventoUrl = `${normalizedAppUrl}/evento/${encodeURIComponent(evento.slug)}`;
 
   const valorTotal = evento.preco_unitario_foto.mul(uniqueFotoIds.length);
   const pedido = await prisma.$transaction(async (transaction) => {
