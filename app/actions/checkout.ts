@@ -68,14 +68,14 @@ export async function checkout(
     throw new Error("A variável de ambiente STRIPE_SECRET_KEY não está configurada.");
   }
 
-  const appUrl =
+  const rawBaseUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3000");
-  const normalizedAppUrl = appUrl.replace(/\/+$/, "");
+  const baseUrl = rawBaseUrl.replace(/\/$/, "");
   const stripe = new Stripe(secretKey);
-  const eventoUrl = `${normalizedAppUrl}/evento/${encodeURIComponent(evento.slug)}`;
+  const eventoSlug = encodeURIComponent(evento.slug);
 
   const valorTotal = evento.preco_unitario_foto.mul(uniqueFotoIds.length);
   const pedido = await prisma.$transaction(async (transaction) => {
@@ -112,8 +112,8 @@ export async function checkout(
         },
       ],
       metadata: { pedidoId: pedido.id },
-      success_url: `${eventoUrl}/sucesso?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: eventoUrl,
+      success_url: `${baseUrl}/evento/${eventoSlug}/sucesso`,
+      cancel_url: `${baseUrl}/evento/${eventoSlug}`,
     });
   } catch (error) {
     console.error("Stripe Checkout session creation failed.", error);
