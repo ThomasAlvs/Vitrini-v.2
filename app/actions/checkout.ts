@@ -68,12 +68,7 @@ export async function checkout(
     throw new Error("A variável de ambiente STRIPE_SECRET_KEY não está configurada.");
   }
 
-  const rawBaseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
-  const baseUrl = rawBaseUrl.replace(/\/$/, "");
+  const baseUrl = "https://vitrini-v-2-nsil.vercel.app";
   const stripe = new Stripe(secretKey);
   const eventoSlug = encodeURIComponent(evento.slug);
 
