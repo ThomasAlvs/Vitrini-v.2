@@ -1,8 +1,9 @@
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import Link from "next/link";
 import { Suspense } from "react";
+import { Footer } from "@/components/Footer";
 import { GaleriaPublica } from "@/components/GaleriaPublica";
+import { Header } from "@/components/Header";
 import { prisma } from "@/lib/prisma";
 import { getS3BucketName, getS3Client } from "@/lib/s3";
 
@@ -47,10 +48,10 @@ async function VitrineConteudo({
 
   if (!evento) {
     return (
-      <div className="mt-20 p-10 text-center text-gray-900">
+      <main className="flex-1 p-10 pt-20 text-center text-gray-900">
         Nenhum evento ATIVO encontrado para o link: <b>{slug}</b>. Verifique se
         a URL está correta e se você ativou o evento no painel.
-      </div>
+      </main>
     );
   }
 
@@ -74,15 +75,7 @@ async function VitrineConteudo({
   );
 
   return (
-    <main className="min-h-screen bg-[#FAFAFA] text-gray-900">
-      <header className="border-b border-gray-200">
-        <div className="mx-auto flex h-20 w-full max-w-7xl items-center px-6 sm:px-10">
-          <Link className="text-xl font-semibold tracking-[0.18em]" href="/">
-            Vitrini
-          </Link>
-        </div>
-      </header>
-
+    <main className="flex-1 bg-[#FAFAFA] text-gray-900">
       <section className="border-b border-gray-200 px-6 py-16 text-center sm:py-24">
         <p className="text-xs font-medium uppercase tracking-[0.3em] text-gray-500">
           Galeria do evento
@@ -129,14 +122,18 @@ export default async function EventoPublicoPage({
   params: Promise<{ slug: string }>;
 }) {
   return (
-    <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-6 text-sm text-gray-500">
-          Carregando vitrine...
-        </main>
-      }
-    >
-      <VitrineConteudo params={params} />
-    </Suspense>
+    <div className="flex min-h-screen flex-col bg-[#FAFAFA] text-gray-900">
+      <Header />
+      <Suspense
+        fallback={
+          <main className="flex flex-1 items-center justify-center px-6 text-sm text-gray-500">
+            Carregando vitrine...
+          </main>
+        }
+      >
+        <VitrineConteudo params={params} />
+      </Suspense>
+      <Footer />
+    </div>
   );
 }
