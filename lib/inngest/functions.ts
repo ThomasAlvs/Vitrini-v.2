@@ -242,7 +242,7 @@ export const enviarFotosCompradas = inngest.createFunction(
 
     const email = await step.run("enviar-email-com-links-de-download", async () => {
       const { data, error } = await resend.emails.send({
-        from: "onboarding@resend.dev",
+        from: "Vitrini Art <vitriniart.envio@gmail.com>",
         to: emailCliente,
         subject: `Suas fotos de ${pedido.nomeEvento} estão prontas`,
         html: `

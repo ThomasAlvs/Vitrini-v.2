@@ -68,7 +68,7 @@ export async function checkout(
     throw new Error("A variável de ambiente STRIPE_SECRET_KEY não está configurada.");
   }
 
-  const baseUrl = "https://vitrini-v-2-nsil.vercel.app";
+  const baseUrl = "https://vitriniart.com.br";
   const stripe = new Stripe(secretKey);
   const eventoSlug = encodeURIComponent(evento.slug);
 
