@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import exifr from "exifr";
+import { randomBytes, randomInt } from "node:crypto";
 import { Resend } from "resend";
 import sharp from "sharp";
 import { inngest } from "@/lib/inngest/client";
@@ -33,28 +34,92 @@ function escaparHtml(value: string) {
   });
 }
 
-function criarSvgMarcaDagua(width: number, height: number) {
-  const fontSize = Math.max(32, Math.round(width / 8));
+function criarSvgProtecaoPreview(width: number, height: number) {
+  const diagonal = Math.ceil(Math.hypot(width, height));
+  const fontSize = Math.max(16, Math.round(Math.min(width, height) / 30));
+  const rowSpacing = fontSize * 3.2;
+  const columnSpacing = fontSize * 11;
+  const watermarks: string[] = [];
+
+  for (let y = -diagonal; y < diagonal * 2; y += rowSpacing) {
+    const rowIndex = Math.round((y + diagonal) / rowSpacing);
+    const offset = rowIndex % 2 === 0 ? 0 : columnSpacing / 2;
+
+    for (let x = -diagonal + offset; x < diagonal * 2; x += columnSpacing) {
+      const opacity = (randomInt(25, 45) / 100).toFixed(2);
+      const jitterX = randomInt(-5, 6);
+      const jitterY = randomInt(-4, 5);
+      const logoSize = fontSize * 0.85;
+
+      watermarks.push(`
+        <g transform="translate(${x + jitterX} ${y + jitterY})" opacity="${opacity}">
+          <circle cx="${logoSize / 2}" cy="0" r="${logoSize / 2}" fill="none" stroke="#fff" stroke-width="1.5" />
+          <text x="${logoSize / 2}" y="${fontSize * 0.15}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize * 0.48}" font-weight="700" fill="#fff">VA</text>
+          <text x="${logoSize + fontSize * 0.35}" y="${fontSize * 0.16}" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="700" letter-spacing="1.5" fill="#fff" stroke="#111" stroke-opacity="0.35" stroke-width="0.8" paint-order="stroke">Vitrini Art</text>
+        </g>
+      `);
+    }
+  }
+
+  const palettes = ["violet", "orange", "dark"];
+  const marks: string[] = [];
+  for (let index = 0; index < 18; index += 1) {
+    const x = randomInt(-Math.round(width * 0.15), Math.ceil(width * 1.05));
+    const y = randomInt(-Math.round(height * 0.15), Math.ceil(height * 1.05));
+    const scale = (randomInt(55, 125) / 100).toFixed(2);
+    const rotation = randomInt(-35, 36);
+    const opacity = (randomInt(8, 19) / 100).toFixed(2);
+    const palette = palettes[randomInt(0, palettes.length)];
+
+    marks.push(`
+      <path
+        d="M 0 34 C 8 6, 34 0, 52 15 C 68 -1, 96 10, 94 35 C 112 52, 94 78, 70 72 C 50 96, 24 79, 22 65 C -2 69, -11 49, 0 34 Z"
+        transform="translate(${x} ${y}) rotate(${rotation}) scale(${scale})"
+        fill="url(#${palette})"
+        opacity="${opacity}"
+      />
+    `);
+  }
+
   return Buffer.from(`
-    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <text
-        x="50%"
-        y="50%"
-        dominant-baseline="middle"
-        text-anchor="middle"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="${fontSize}"
-        font-weight="700"
-        letter-spacing="8"
-        fill="#ffffff"
-        fill-opacity="0.4"
-        stroke="#111111"
-        stroke-opacity="0.15"
-        stroke-width="1"
-        paint-order="stroke"
-      >VITRINI</text>
+    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#7c3aed" stop-opacity="0.9" />
+          <stop offset="1" stop-color="#312e81" stop-opacity="0.65" />
+        </linearGradient>
+        <linearGradient id="orange" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#fb923c" stop-opacity="0.9" />
+          <stop offset="1" stop-color="#c2410c" stop-opacity="0.65" />
+        </linearGradient>
+        <linearGradient id="dark" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#111827" stop-opacity="0.75" />
+          <stop offset="1" stop-color="#374151" stop-opacity="0.55" />
+        </linearGradient>
+      </defs>
+      ${marks.join("")}
+      <g transform="rotate(-32 ${width / 2} ${height / 2})">
+        ${watermarks.join("")}
+      </g>
     </svg>
   `);
+}
+
+function criarRuidoPreview(width: number, height: number) {
+  const pixelCount = width * height;
+  const randomValues = randomBytes(pixelCount * 2);
+  const noise = Buffer.alloc(pixelCount * 4);
+
+  for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+    const value = randomValues[pixel * 2] >= 128 ? 255 : 0;
+    const offset = pixel * 4;
+    noise[offset] = value;
+    noise[offset + 1] = value;
+    noise[offset + 2] = value;
+    noise[offset + 3] = 10 + (randomValues[pixel * 2 + 1] % 15);
+  }
+
+  return noise;
 }
 
 export const processarFoto = inngest.createFunction(
@@ -108,17 +173,38 @@ export const processarFoto = inngest.createFunction(
 
       const resized = await sharp(buffer)
         .rotate()
-        .resize({ width: 1200, withoutEnlargement: true })
+        .resize({
+          width: 1200,
+          height: 1200,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
         .toBuffer({ resolveWithObject: true });
+
+      const noiseBuffer = await sharp(criarRuidoPreview(
+        resized.info.width,
+        resized.info.height,
+      ), {
+        raw: {
+          width: resized.info.width,
+          height: resized.info.height,
+          channels: 4,
+        },
+      })
+        .png()
+        .toBuffer();
 
       const watermarkedBuffer = await sharp(resized.data)
         .composite([
           {
-            input: criarSvgMarcaDagua(
+            input: noiseBuffer,
+            blend: "soft-light",
+          },
+          {
+            input: criarSvgProtecaoPreview(
               resized.info.width,
               resized.info.height,
             ),
-            gravity: "centre",
           },
         ])
         .webp({ quality: 70 })
