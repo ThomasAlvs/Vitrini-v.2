@@ -4,7 +4,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import exifr from "exifr";
-import { randomBytes, randomInt } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { Resend } from "resend";
 import sharp from "sharp";
 import { inngest } from "@/lib/inngest/client";
@@ -35,72 +35,17 @@ function escaparHtml(value: string) {
 }
 
 function criarSvgProtecaoPreview(width: number, height: number) {
-  const diagonal = Math.ceil(Math.hypot(width, height));
-  const fontSize = Math.max(16, Math.round(Math.min(width, height) / 30));
-  const rowSpacing = fontSize * 3.2;
-  const columnSpacing = fontSize * 11;
-  const watermarks: string[] = [];
-
-  for (let y = -diagonal; y < diagonal * 2; y += rowSpacing) {
-    const rowIndex = Math.round((y + diagonal) / rowSpacing);
-    const offset = rowIndex % 2 === 0 ? 0 : columnSpacing / 2;
-
-    for (let x = -diagonal + offset; x < diagonal * 2; x += columnSpacing) {
-      const opacity = (randomInt(25, 45) / 100).toFixed(2);
-      const jitterX = randomInt(-5, 6);
-      const jitterY = randomInt(-4, 5);
-      const logoSize = fontSize * 0.85;
-
-      watermarks.push(`
-        <g transform="translate(${x + jitterX} ${y + jitterY})" opacity="${opacity}">
-          <circle cx="${logoSize / 2}" cy="0" r="${logoSize / 2}" fill="none" stroke="#fff" stroke-width="1.5" />
-          <text x="${logoSize / 2}" y="${fontSize * 0.15}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize * 0.48}" font-weight="700" fill="#fff">VA</text>
-          <text x="${logoSize + fontSize * 0.35}" y="${fontSize * 0.16}" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="700" letter-spacing="1.5" fill="#fff" stroke="#111" stroke-opacity="0.35" stroke-width="0.8" paint-order="stroke">Vitrini Art</text>
-        </g>
-      `);
-    }
-  }
-
-  const palettes = ["violet", "orange", "dark"];
-  const marks: string[] = [];
-  for (let index = 0; index < 18; index += 1) {
-    const x = randomInt(-Math.round(width * 0.15), Math.ceil(width * 1.05));
-    const y = randomInt(-Math.round(height * 0.15), Math.ceil(height * 1.05));
-    const scale = (randomInt(55, 125) / 100).toFixed(2);
-    const rotation = randomInt(-35, 36);
-    const opacity = (randomInt(8, 19) / 100).toFixed(2);
-    const palette = palettes[randomInt(0, palettes.length)];
-
-    marks.push(`
-      <path
-        d="M 0 34 C 8 6, 34 0, 52 15 C 68 -1, 96 10, 94 35 C 112 52, 94 78, 70 72 C 50 96, 24 79, 22 65 C -2 69, -11 49, 0 34 Z"
-        transform="translate(${x} ${y}) rotate(${rotation}) scale(${scale})"
-        fill="url(#${palette})"
-        opacity="${opacity}"
-      />
-    `);
-  }
-
   return Buffer.from(`
     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#7c3aed" stop-opacity="0.9" />
-          <stop offset="1" stop-color="#312e81" stop-opacity="0.65" />
-        </linearGradient>
-        <linearGradient id="orange" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#fb923c" stop-opacity="0.9" />
-          <stop offset="1" stop-color="#c2410c" stop-opacity="0.65" />
-        </linearGradient>
-        <linearGradient id="dark" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#111827" stop-opacity="0.75" />
-          <stop offset="1" stop-color="#374151" stop-opacity="0.55" />
-        </linearGradient>
+        <pattern id="watermark" width="440" height="250" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+          <text x="12" y="145" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="800" letter-spacing="3" fill="white" fill-opacity="0.6" stroke="#111827" stroke-opacity="0.32" stroke-width="1.5" paint-order="stroke">VITRINI ART</text>
+        </pattern>
       </defs>
-      ${marks.join("")}
-      <g transform="rotate(-32 ${width / 2} ${height / 2})">
-        ${watermarks.join("")}
-      </g>
+      <circle cx="${width * 0.12}" cy="${height * 0.18}" r="${Math.min(width, height) * 0.2}" fill="#7c3aed" fill-opacity="0.36" />
+      <path d="M ${width * 0.62} ${height * 0.02} C ${width * 0.92} ${height * 0.08}, ${width * 0.82} ${height * 0.3}, ${width * 1.02} ${height * 0.36} L ${width * 0.92} ${height * 0.58} C ${width * 0.72} ${height * 0.46}, ${width * 0.58} ${height * 0.22}, ${width * 0.62} ${height * 0.02} Z" fill="#dc2626" fill-opacity="0.34" />
+      <ellipse cx="${width * 0.46}" cy="${height * 0.9}" rx="${width * 0.25}" ry="${height * 0.14}" transform="rotate(-18 ${width * 0.46} ${height * 0.9})" fill="#374151" fill-opacity="0.32" />
+      <rect width="${width}" height="${height}" fill="url(#watermark)" />
     </svg>
   `);
 }
@@ -174,8 +119,8 @@ export const processarFoto = inngest.createFunction(
       const resized = await sharp(buffer)
         .rotate()
         .resize({
-          width: 1200,
-          height: 1200,
+          width: 800,
+          height: 800,
           fit: "inside",
           withoutEnlargement: true,
         })
@@ -207,7 +152,7 @@ export const processarFoto = inngest.createFunction(
             ),
           },
         ])
-        .webp({ quality: 70 })
+        .webp({ quality: 60 })
         .toBuffer();
 
       const watermarkedKey = `watermarks/${fotoId}.webp`;
